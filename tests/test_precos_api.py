@@ -100,10 +100,7 @@ def test_filtro_por_uf_invalida_retorna_400(auth_client):
     assert 'uf' in resposta.json()
 
 
-def test_filtro_por_vendedor_fallback_case_insensitive(auth_client, monkeypatch):
-    """Sem normalizador implementado, o filtro cai para iexact (NotImplementedError)."""
-    from data.normalizers import normalizar_vendedor  # noqa: F401
-
+def test_filtro_por_vendedor_aceita_nome_com_espacos(auth_client):
     produto = _produto()
     vendedor = Vendedor.objects.create(nome='Casas Bahia', nome_normalizado='casasbahia')
     _preco(produto, vendedor)
@@ -113,18 +110,13 @@ def test_filtro_por_vendedor_fallback_case_insensitive(auth_client, monkeypatch)
     assert resposta.json()['count'] == 1
 
 
-def test_filtro_por_vendedor_usa_chave_normalizada(auth_client, monkeypatch):
-    import apps.products.views as views_produtos
-
-    monkeypatch.setattr(
-        views_produtos, 'normalizar_vendedor', lambda nome: nome.lower().replace(' ', '')
-    )
+def test_filtro_por_vendedor_usa_chave_normalizada(auth_client):
     produto = _produto()
     vendedor = Vendedor.objects.create(nome='Casas Bahia', nome_normalizado='casasbahia')
     _preco(produto, vendedor)
 
-    # consulta com forma diferente do nome armazenado, igual via chave normalizada
-    resposta = auth_client.get('/api/precos/?vendedor=CASASBAHIA')
+    # caixa e espaços extras: casa pela chave normalizada, não pelo nome literal
+    resposta = auth_client.get('/api/precos/?vendedor=CASAS%20%20BAHIA')
     assert resposta.status_code == 200
     assert resposta.json()['count'] == 1
 

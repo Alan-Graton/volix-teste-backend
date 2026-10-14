@@ -31,24 +31,16 @@ def _uf_param(valor: str, campo: str = 'uf') -> str:
 
 
 def _filtrar_por_vendedor(queryset, valor: str):
-    """Filtro por vendedor: chave normalizada, com fallback case-insensitive.
-
-    Enquanto ``data.normalizers.normalizar_vendedor`` não estiver implementado
-    (NotImplementedError), cai para igualdade case-insensitive pelo nome.
-    """
+    """Filtro por vendedor: nome exato (caixa-insensitive) OU chave normalizada."""
     from django.db.models import Q
 
     valor = valor.strip()
     if not valor:
         return queryset
-    condicao = Q(vendedor__nome__iexact=valor)
-    try:
-        chave = normalizar_vendedor(valor)
-    except NotImplementedError:
-        chave = None
-    if chave:
-        condicao |= Q(vendedor__nome_normalizado=chave)
-    return queryset.filter(condicao)
+    return queryset.filter(
+        Q(vendedor__nome__iexact=valor)
+        | Q(vendedor__nome_normalizado=normalizar_vendedor(valor))
+    )
 
 
 class PrecoVigenteListView(generics.ListAPIView):

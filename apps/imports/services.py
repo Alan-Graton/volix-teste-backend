@@ -1,8 +1,8 @@
 """Orquestração do processamento de importações.
 
 Esta camada NÃO trata o CSV: leitura, validação e normalização dos campos
-ficam no pacote ``data/`` (implementação manual pendente). Aqui ficam as
-regras de negócio do enunciado que não dependem do conteúdo das linhas:
+ficam no pacote ``data/``. Aqui ficam as regras de negócio do enunciado que
+não dependem do conteúdo das linhas:
 
 - resposta imediata do upload (despacho assíncrono via Celery);
 - idempotência: mesmo arquivo duas vezes não duplica dados;
@@ -21,7 +21,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from data.exceptions import ArquivoInvalido, LinhaRejeitada
-from data.normalizers import LinhaNormalizada, processar_linha
+from data.normalizers import LinhaNormalizada, nomes_coincidem, processar_linha
 from data.parsers import iterar_linhas
 
 from .models import Importacao, ImportacaoLinha
@@ -168,7 +168,12 @@ def _processar_uma_linha(
 
 
 def _resolver_produto(linha: LinhaNormalizada):
-    """Cria/atualiza o produto; rejeita a linha se o EAN divergir do cadastrado."""
+    """Cria o produto na primeira linha; rejeita divergências nas seguintes.
+
+    Cadastro definido pela primeira ocorrência do SKU: EAN divergente, nome
+    diferente (ignorando caixa/espaços) ou embalagem diferente rejeitam a
+    linha com motivos explícitos na quarentena. Só o EAN ausente é preenchido.
+    """
     from apps.products.models import Produto
 
     produto = Produto.objects.filter(sku=linha.sku).first()
@@ -186,21 +191,22 @@ def _resolver_produto(linha: LinhaNormalizada):
             f'EAN divergente para o SKU {produto.sku}: cadastrado {produto.ean}, '
             f'linha informa {linha.ean}.'
         )
+    if not nomes_coincidem(produto.nome, linha.produto_nome):
+        motivos.append(
+            f'Nome divergente para o SKU {produto.sku}: cadastrado {produto.nome!r}, '
+            f'linha informa {linha.produto_nome!r}.'
+        )
+    if produto.embalagem != linha.embalagem:
+        motivos.append(
+            f'Embalagem divergente para o SKU {produto.sku}: cadastrada '
+            f'{produto.embalagem}, linha informa {linha.embalagem}.'
+        )
     if motivos:
         raise LinhaRejeitada(motivos)
 
-    campos = []
     if produto.ean is None and linha.ean:
         produto.ean = linha.ean
-        campos.append('ean')
-    if produto.nome != linha.produto_nome:
-        produto.nome = linha.produto_nome
-        campos.append('nome')
-    if produto.embalagem != linha.embalagem:
-        produto.embalagem = linha.embalagem
-        campos.append('embalagem')
-    if campos:
-        produto.save(update_fields=campos + ['atualizado_em'])
+        produto.save(update_fields=['ean', 'atualizado_em'])
     return produto
 
 

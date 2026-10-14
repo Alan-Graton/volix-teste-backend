@@ -136,12 +136,12 @@ def test_vigencia_e_por_vendedor_e_uf(db):
 
 
 # --------------------------------------------------------------------------- #
-# produto: EAN divergente rejeita a linha; demais campos atualizam
+# produto: a primeira linha define o cadastro; divergências rejeitam a linha
 # --------------------------------------------------------------------------- #
 
 
 def test_ean_divergente_rejeita_linha(db):
-    Produto.objects.create(sku='SKU-9001', nome='P', ean='7890001000051')
+    Produto.objects.create(sku='SKU-9001', nome='Produto Serviço', ean='7890001000051')
     with pytest.raises(LinhaRejeitada) as capturado:
         services._resolver_produto(_linha(ean='789000137019'))
     motivos = capturado.value.motivos
@@ -159,21 +159,49 @@ def test_produto_criado_na_primeira_linha(db):
 
 
 def test_produto_sem_ean_cadastrado_preenche(db):
-    Produto.objects.create(sku='SKU-9001', nome='Antigo', ean=None, embalagem=1)
+    Produto.objects.create(sku='SKU-9001', nome='Produto Serviço', ean=None, embalagem=1)
     produto = services._resolver_produto(_linha())
     assert produto.ean == '7890001000051'
     assert produto.nome == 'Produto Serviço'
 
 
-def test_produto_atualiza_nome_e_embalagem(db):
-    Produto.objects.create(sku='SKU-9001', nome='Nome Velho', ean='7890001000051', embalagem=6)
-    produto = services._resolver_produto(_linha(embalagem=2))
-    assert produto.nome == 'Produto Serviço'
-    assert produto.embalagem == 2
+def test_produto_com_nome_divergente_rejeita_linha(db):
+    Produto.objects.create(
+        sku='SKU-9001', nome='Produto Serviço', ean='7890001000051', embalagem=1
+    )
+    with pytest.raises(LinhaRejeitada) as capturado:
+        services._resolver_produto(_linha(produto_nome='Outro Nome Completo'))
+    motivos = capturado.value.motivos
+    assert len(motivos) == 1
+    assert 'Nome divergente' in motivos[0]
+    assert 'Outro Nome Completo' in motivos[0]
+
+
+def test_produto_com_embalagem_divergente_rejeita_linha(db):
+    Produto.objects.create(
+        sku='SKU-9001', nome='Produto Serviço', ean='7890001000051', embalagem=1
+    )
+    with pytest.raises(LinhaRejeitada) as capturado:
+        services._resolver_produto(_linha(embalagem=12))
+    motivos = capturado.value.motivos
+    assert len(motivos) == 1
+    assert 'Embalagem divergente' in motivos[0]
+
+
+def test_produto_com_nome_em_caixa_diferente_passa(db):
+    """Caixa/espaços não contam como divergência (normalização de nome)."""
+    Produto.objects.create(
+        sku='SKU-9001', nome='Produto  Serviço', ean='7890001000051', embalagem=1
+    )
+    produto = services._resolver_produto(_linha(produto_nome='produto serviço'))
+    assert produto.pk is not None
+    assert produto.nome == 'Produto  Serviço'  # cadastro da primeira linha permanece
 
 
 def test_produto_existente_com_ean_igual_passa(db):
-    Produto.objects.create(sku='SKU-9001', nome='P', ean='7890001000051', embalagem=1)
+    Produto.objects.create(
+        sku='SKU-9001', nome='Produto Serviço', ean='7890001000051', embalagem=1
+    )
     produto = services._resolver_produto(_linha())
     assert produto.pk is not None
 

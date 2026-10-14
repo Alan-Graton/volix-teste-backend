@@ -2,7 +2,7 @@
 
 Estes testes cobrem SOMENTE a conversão estrutural. As regras de validação e
 normalização do conteúdo são testadas em ``test_validators.py`` e
-``test_normalizers.py`` (pendentes de implementação).
+``test_normalizers.py``.
 """
 import json
 from pathlib import Path

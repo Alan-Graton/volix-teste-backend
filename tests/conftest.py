@@ -1,11 +1,12 @@
 """Fixtures compartilhadas dos testes.
 
-Observação sobre o tratamento do CSV: os testes usam um DUBLÊ de
+Observação sobre o tratamento do CSV: a maioria dos testes de *pipeline*
+(persistência, deduplicação, vigência, quarentena) usa um DUBLÊ de
 ``processar_linha`` (regras mínimas e determinísticas) para exercitar o
-*pipeline* (persistência, deduplicação, vigência, quarentena). As regras
-reais de validação/normalização são de responsabilidade de quem trata os
-dados e têm seus próprios arquivos de teste (``test_validators.py`` e
-``test_normalizers.py``, ainda pendentes).
+fluxo sem depender do conteúdo do arquivo. As regras reais de
+validação/normalização são testadas diretamente em ``test_validators.py`` e
+``test_normalizers.py``, e de ponta a ponta com o CSV real em
+``test_importacao_real.py``.
 """
 from __future__ import annotations
 

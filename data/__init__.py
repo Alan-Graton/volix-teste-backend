@@ -1,1 +1,1 @@
-"""Contratos de erro do tratamento de dados do CSV."""
+"""Fronteira do tratamento do CSV: leitura (pandas), validação e normalização."""
