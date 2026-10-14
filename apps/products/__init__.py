@@ -1,0 +1,1 @@
+"""Aplicação de produtos e preços de concorrentes."""

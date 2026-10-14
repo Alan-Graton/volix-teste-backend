@@ -1,0 +1,1 @@
+"""Contratos de erro do tratamento de dados do CSV."""
